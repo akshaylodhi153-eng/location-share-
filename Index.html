@@ -1,0 +1,224 @@
+
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Location Share</title>
+  <meta name="theme-color" content="#101828">
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+      background: #101828;
+      color: white;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 420px;
+      padding: 25px;
+      background: #1d2939;
+      border: 1px solid #344054;
+      border-radius: 22px;
+      text-align: center;
+    }
+
+    .pin { font-size: 55px; }
+
+    h1 { margin: 10px 0; }
+
+    p {
+      color: #d0d5dd;
+      line-height: 1.6;
+      font-size: 15px;
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      margin-top: 12px;
+      border: 0;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .primary { background: #1570ef; color: white; }
+    .secondary { background: #344054; color: white; }
+
+    #result {
+      display: none;
+      margin-top: 20px;
+      padding: 15px;
+      background: #101828;
+      border-radius: 12px;
+      overflow-wrap: anywhere;
+    }
+
+    a { color: #84caff; }
+
+    .small { font-size: 12px; color: #98a2b3; }
+  </style>
+</head>
+
+<body>
+  <main class="card">
+    <div class="pin">📍</div>
+    <h1>Location Share</h1>
+
+    <p>
+      अपनी वर्तमान लोकेशन प्राप्त करें और अपनी मर्जी से
+      किसी व्यक्ति के साथ शेयर करें।
+      लोकेशन लेने से पहले आपकी अनुमति माँगी जाएगी।
+    </p>
+
+    <button class="primary" id="locate">
+      📍 मेरी लोकेशन प्राप्त करें
+    </button>
+
+    <div id="result" aria-live="polite">
+      <h3>आपकी लोकेशन</h3>
+      <p id="coords"></p>
+      <p id="accuracy"></p>
+      <a id="mapLink" target="_blank"
+         rel="noopener noreferrer">मैप पर देखें</a>
+
+      <button class="primary" id="share">
+        लोकेशन शेयर करें
+      </button>
+
+      <button class="secondary" id="copy">
+        निर्देशांक कॉपी करें
+      </button>
+    </div>
+
+    <p id="status" role="status"></p>
+    <p class="small">
+      आपकी लोकेशन अपने आप किसी दूसरे व्यक्ति को नहीं भेजी जाती।
+      शेयर करने का निर्णय आपका है।
+    </p>
+  </main>
+
+  <script>
+    const locateBtn = document.getElementById("locate");
+    const result = document.getElementById("result");
+    const status = document.getElementById("status");
+
+    let locationData = null;
+
+    locateBtn.addEventListener("click", () => {
+      if (!navigator.geolocation) {
+        status.textContent =
+          "आपका ब्राउज़र लोकेशन सुविधा सपोर्ट नहीं करता।";
+        return;
+      }
+
+      status.textContent = "लोकेशन प्राप्त की जा रही है...";
+      locateBtn.disabled = true;
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+          const accuracy = position.coords.accuracy;
+
+          locationData = {
+            latitude: lat,
+            longitude: lon,
+            accuracy: accuracy
+          };
+
+          document.getElementById("coords").textContent =
+            `Latitude: ${lat}\nLongitude: ${lon}`;
+
+          document.getElementById("accuracy").textContent =
+            `अनुमानित सटीकता: ${Math.round(accuracy)} मीटर`;
+
+          document.getElementById("mapLink").href =
+            `https://www.google.com/maps?q=${lat},${lon}`;
+
+          result.style.display = "block";
+          status.textContent = "लोकेशन मिल गई। अब चाहें तो शेयर करें।";
+          locateBtn.disabled = false;
+        },
+        (error) => {
+          const messages = {
+            1: "लोकेशन की अनुमति नहीं मिली।",
+            2: "लोकेशन उपलब्ध नहीं है।",
+            3: "समय समाप्त हुआ। दोबारा कोशिश करें।"
+          };
+
+          status.textContent =
+            messages[error.code] || "लोकेशन प्राप्त नहीं हो सकी।";
+          locateBtn.disabled = false;
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 20000,
+          maximumAge: 0
+        }
+      );
+    });
+
+    document.getElementById("share").addEventListener("click",
+      async () => {
+        if (!locationData) return;
+
+        const { latitude, longitude, accuracy } = locationData;
+        const mapUrl =
+          `https://www.google.com/maps?q=${latitude},${longitude}`;
+
+        const message =
+          `मेरी साझा की गई लोकेशन:\n${mapUrl}\n` +
+          `अनुमानित सटीकता: ${Math.round(accuracy)} मीटर`;
+
+        try {
+          if (navigator.share) {
+            await navigator.share({
+              title: "मेरी लोकेशन",
+              text: message,
+              url: mapUrl
+            });
+          } else {
+            await navigator.clipboard.writeText(message);
+            status.textContent =
+              "लोकेशन कॉपी हुई। अब इसे मैसेज में भेज सकते हैं।";
+          }
+        } catch (error) {
+          if (error.name !== "AbortError") {
+            status.textContent =
+              "शेयर नहीं हो सका। निर्देशांक कॉपी करके भेजें।";
+          }
+        }
+      }
+    );
+
+    document.getElementById("copy").addEventListener("click",
+      async () => {
+        if (!locationData) return;
+
+        const text =
+          `${locationData.latitude}, ${locationData.longitude}`;
+
+        try {
+          await navigator.clipboard.writeText(text);
+          status.textContent = "निर्देशांक कॉपी हो गए।";
+        } catch {
+          status.textContent =
+            "कॉपी नहीं हो सका। ऊपर दिए निर्देशांक कॉपी करें।";
+        }
+      }
+    );
+  </script>
+</body>
+  </html>
+  
